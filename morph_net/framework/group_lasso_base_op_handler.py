@@ -21,15 +21,19 @@ class GroupLassoBaseSourceOpHandler(op_handler.OpHandler):
 
   __metaclass__ = abc.ABCMeta
 
-  def __init__(self, threshold, l1_fraction=0.0):
+  def __init__(self, threshold, l1_fraction=0.0, convert_to_variable=True):
     """Instantiate an instance.
 
     Args:
       threshold: Float scalar used as threshold for GroupLassoRegularizer.
       l1_fraction: Float scalar used as l1_fraction for GroupLassoRegularizer.
+      convert_to_variable: Do not call tpu_util.maybe_convert_to_variable.
+        If you're not running on TPU or use tf.get_variable to create filters,
+        then this breaks your ability to run GroupLasoo.
     """
     self._threshold = threshold
     self._l1_fraction = l1_fraction
+    self._convert_to_variable = convert_to_variable
 
   @abc.abstractmethod
   def _reduce_dims(self, op):
@@ -113,7 +117,8 @@ class GroupLassoBaseSourceOpHandler(op_handler.OpHandler):
     start_index = op_slice.slice.start_index
     size = op_slice.slice.size
     weights = op_slice.op.inputs[1]  # Input 1 are the weights.
-    weights = tpu_util.maybe_convert_to_variable(weights)
+    if self._convert_to_variable:
+      weights = tpu_util.maybe_convert_to_variable(weights)
     reduce_dims = self._reduce_dims(op_slice.op)
     rank = len(weights.shape.as_list())
     assert rank == len(reduce_dims) + 1
